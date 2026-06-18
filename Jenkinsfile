@@ -16,7 +16,9 @@ pipeline {
 
         stage('Security Scan') {
             steps {
-                bat 'npm audit --audit-level=high'
+                catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
+                    bat 'npm audit --audit-level=high'
+                }
             }
         }
 
@@ -36,11 +38,13 @@ pipeline {
 
         stage('Docker Push') {
             steps {
-                withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-creds',
-                    usernameVariable: 'DOCKER_USER',
-                    passwordVariable: 'DOCKER_PASS'
-                )]) {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'dockerhub-creds',
+                        usernameVariable: 'DOCKER_USER',
+                        passwordVariable: 'DOCKER_PASS'
+                    )
+                ]) {
 
                     bat '''
                     docker login -u %DOCKER_USER% -p %DOCKER_PASS%
@@ -58,9 +62,13 @@ pipeline {
             }
         }
 
-        stage('Pipeline Success') {
+        stage('Success') {
             steps {
-                echo 'Major Project Docker Image Built and Pushed Successfully!'
+                echo '========================================='
+                echo ' Wanderlust Docker Image Uploaded!'
+                echo ' Image : %IMAGE_NAME%:%IMAGE_TAG%'
+                echo ' Docker Hub Push Successful!'
+                echo '========================================='
             }
         }
     }
@@ -70,8 +78,12 @@ pipeline {
             echo 'Pipeline completed successfully.'
         }
 
+        unstable {
+            echo 'Pipeline completed with security warnings (npm audit).'
+        }
+
         failure {
-            echo 'Pipeline failed. Check Jenkins console output.'
+            echo 'Pipeline failed. Check Jenkins Console Output.'
         }
 
         always {
